@@ -6,8 +6,10 @@ all_codes = get_all_stock_codes(constants.stock_code_url)
 
 for code in all_codes:
     data = get_stock_data(constants.s_type, constants.s_url, constants.s_token, code)
+    refined_data = []
     for item in data:
-        refined_data = {}
+        refined_item = {}
         for field in constants.fields:
-            refined_data[field] = item[field]
+            refined_item[field] = item[field]
+        refined_data.append(refined_item)
 
