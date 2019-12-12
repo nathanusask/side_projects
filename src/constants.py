@@ -15,3 +15,11 @@ fields = [
     'SHAREHOLDSUM',
     'CLOSEPRICE'
 ]
+
+company_info_url_prefix = 'https://finance.sina.com.cn/realstock/company/sh'
+company_info_url_suffix = '/nc.shtml'
+split_term = ' = '
+search_term_var_totalcapital = 'var totalcapital'
+search_term_var_currcapital = 'var currcapital'
+ten_thousand = 1e4
+semicolon = ';'
