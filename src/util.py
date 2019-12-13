@@ -105,7 +105,7 @@ def if_data_satisfies_model(data, record):
     resp = {}
     if record[constants.const_s_curr_capital] > 0:
         buy_in = (float(data[0][constants.SHARE_HOLD_SUM]) - float(data[-1][constants.SHARE_HOLD_SUM])) / record[constants.const_s_curr_capital]
-        total_share_hold_percentage = float(data[0][constants.SHARE_HOLD_PRICE]) / record[constants.const_s_curr_capital]
+        total_share_hold_percentage = float(data[0][constants.SHARE_HOLD_SUM]) / record[constants.const_s_curr_capital]
         resp[constants.const_if_model_satisfied] = buy_in > 0.005 and total_share_hold_percentage > 0.02
         resp[constants.const_total_buy_in] = buy_in
         resp[constants.const_share_hold_percentage] = total_share_hold_percentage
