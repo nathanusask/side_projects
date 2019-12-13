@@ -3,6 +3,8 @@ import requests as req
 import src.constants as constants
 from operator import itemgetter
 import os
+import csv
+import datetime
 
 
 def get_all_stock_codes(url):
@@ -23,7 +25,10 @@ def get_stock_data(s_type, url, token, code):
     s_filter = '(SCODE=\'' + code + '\')'  # s_code shoud be obtained from outside
     params = {'type': s_type, 'token': token, 'filter': s_filter}
     resp = req.get(url, params)
-    return resp.json()
+    try:
+        return resp.json()
+    except:
+        return []
 
 
 def get_company_info(s_code):
@@ -85,6 +90,8 @@ def read_code_and_company_info():
 
 def get_stock_data_for_past_twenty_days_of_one_company(code):
     data = get_stock_data(constants.s_type, constants.s_url, constants.s_token, code)
+    if len(data) == 0:
+        return []
     refined_data = []
     for item in data:
         refined_item = {}
@@ -92,6 +99,18 @@ def get_stock_data_for_past_twenty_days_of_one_company(code):
             refined_item[field] = item[field]
         refined_data.append(refined_item)
     return sorted(refined_data, key=itemgetter(constants.HD_DATE))
+
+
+def if_data_satisfies_model(data, record):
+    resp = {}
+    if record[constants.const_s_curr_capital] > 0:
+        buy_in = (float(data[0][constants.SHARE_HOLD_PRICE]) - float(data[-1][constants.SHARE_HOLD_PRICE])) / record[constants.const_s_curr_capital]
+        total_share_hold_percentage = float(data[0][constants.SHARE_HOLD_PRICE]) / record[constants.const_s_curr_capital]
+        resp[constants.const_if_model_satisfied] = buy_in > 0.005 and total_share_hold_percentage > 0.02
+        resp[constants.const_total_buy_in] = buy_in
+        resp[constants.const_share_hold_percentage] = total_share_hold_percentage
+        return resp
+    return {constants.const_if_model_satisfied: False}
 
 
 def process():
@@ -106,17 +125,29 @@ def process():
         records = read_code_and_company_info()
         print('Finish loading data')
 
+    now = datetime.datetime.now()
+    csv_filename = "%d_%d_%d.csv"%(now.year, now.month, now.day)
+    csv_file = open(csv_filename, 'w')
+    headers = [
+        constants.const_ch_stock_code,
+        constants.const_ch_stock_name,
+        constants.const_ch_share_hold_percentage,
+        constants.const_ch_total_buy_in
+    ]
+    writer = csv.DictWriter(csv_file, fieldnames=headers)
+    writer.writeheader()
     for record in records:
-        print('Now for stock', record[constants.const_s_code], '--', data[0][constants.STOCK_NAME])
+        print('Now for stock', record[constants.const_s_code])
         data = get_stock_data_for_past_twenty_days_of_one_company(record[constants.const_s_code])
-        if if_data_satisfies_model(data, record):
-            print(data[0][constants.STOCK_NAME], 'satisfies our model')
-            print(record[constants.const_s_code] + '\t' + data[0][constants.STOCK_NAME])
-        else:
-            print(data[0][constants.STOCK_NAME], 'does not satisfy our model')
-
-
-def if_data_satisfies_model(data, record):
-    rate1 = (float(data[0][constants.SHARE_HOLD_PRICE]) - float(data[-1][constants.SHARE_HOLD_PRICE])) / record[constants.const_s_curr_capital]
-    rate2 = float(data[0][constants.SHARE_HOLD_PRICE]) / record[constants.const_s_curr_capital]
-    return rate1 > 0.005 and rate2 > 0.02
+        if len(data) == 0:
+            continue
+        resp = if_data_satisfies_model(data, record)
+        if resp[constants.const_if_model_satisfied]:
+            row = {
+                constants.const_ch_stock_code: record[constants.const_s_code],
+                constants.const_ch_stock_name: data[0][constants.STOCK_NAME],
+                constants.const_ch_share_hold_percentage: resp[constants.const_share_hold_percentage],
+                constants.const_ch_total_buy_in: resp[constants.const_total_buy_in]
+            }
+            writer.writerow(row)
+    csv_file.close()

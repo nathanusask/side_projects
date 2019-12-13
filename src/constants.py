@@ -38,3 +38,11 @@ search_term_var_totalcapital = 'var totalcapital'
 search_term_var_currcapital = 'var currcapital'
 ten_thousand = 1e4
 semicolon = ';'
+
+const_if_model_satisfied = 'if_data_satisfies_model'
+const_ch_share_hold_percentage = '持仓比'
+const_share_hold_percentage = 'share_hold_percentage'
+const_ch_total_buy_in = '累计买入'
+const_total_buy_in = 'total_buy_in'
+const_ch_stock_code = '股票代码'
+const_ch_stock_name = '股票名称'
