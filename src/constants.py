@@ -49,3 +49,5 @@ const_ch_stock_name = '股票名称'
 
 const_threshold_share_hold_percentage = 0.02
 const_threshold_buy_in = 0.005
+
+const_time_frames = [20, 5, 1]

@@ -3,8 +3,8 @@ import requests as req
 import src.constants as constants
 from operator import itemgetter
 import os
-import csv
 import datetime
+from pandas import DataFrame, ExcelWriter
 
 
 def get_all_stock_codes(url):
@@ -24,7 +24,10 @@ def get_all_stock_codes(url):
 def get_stock_data(s_type, url, token, code):
     s_filter = '(SCODE=\'' + code + '\')'  # s_code shoud be obtained from outside
     params = {'type': s_type, 'token': token, 'filter': s_filter}
-    resp = req.get(url, params)
+    try:
+        resp = req.get(url, params)
+    except:
+        return []
     try:
         return resp.json()
     except:
@@ -116,8 +119,8 @@ def if_data_satisfies_model(data, record,
         curr_capital = record[constants.const_s_curr_capital]
         buy_in = (share_hold_sum_today - share_hold_sum_range) / curr_capital
         share_hold_percentage = share_hold_sum_today / curr_capital
-        resp[
-            constants.const_if_model_satisfied] = buy_in > threshold_buy_in and share_hold_percentage > threshold_share_hold_percentage
+        resp[constants.const_if_model_satisfied] = buy_in > threshold_buy_in \
+                                                   and share_hold_percentage > threshold_share_hold_percentage
         resp[constants.const_total_buy_in] = buy_in
         resp[constants.const_share_hold_percentage] = share_hold_percentage
         return resp
@@ -138,19 +141,19 @@ def process(
         records = read_code_and_company_info()
         print('Finish loading data')
 
-    now = datetime.datetime.now()
+    today = datetime.datetime.today()
     headers = [
         constants.const_ch_stock_code,
         constants.const_ch_stock_name,
         constants.const_ch_share_hold_percentage,
         constants.const_ch_total_buy_in
     ]
-    time_frames = [20, 5, 1]
-    csv_filenames = ["%d_%d_%d_past_%d.csv" % (now.year, now.month, now.day, time_frame) for time_frame in time_frames]
-    csv_files = [open(csv_filename, 'w') for csv_filename in csv_filenames]
-    writers = [csv.DictWriter(csv_file, fieldnames=headers) for csv_file in csv_files]
-    for writer in writers:
-        writer.writeheader()
+    time_frames = constants.const_time_frames
+    xls_filename = today.strftime("%y_%m_%d") + ".xlsx"
+    sheet_names = ["past_%d" % time_frame for time_frame in time_frames]
+    excel_writer = ExcelWriter(xls_filename, engine='xlsxwriter', date_format='YYYY-MM-DD')
+    len_time_frames = len(time_frames)
+    rows_by_time_frame = [[] for _ in range(len_time_frames)]
     for record in records:
         print('Now for stock', record[constants.const_s_code])
         data = get_stock_data_for_past_twenty_days_of_one_company(record[constants.const_s_code])
@@ -170,7 +173,9 @@ def process(
                     constants.const_ch_share_hold_percentage: resp[constants.const_share_hold_percentage],
                     constants.const_ch_total_buy_in: resp[constants.const_total_buy_in]
                 }
-                writers[i].writerow(row)
+                rows_by_time_frame[i].append(row)
 
-    for csv_file in csv_files:
-        csv_file.close()
+    for i, sheet_name in enumerate(sheet_names):
+        df = DataFrame.from_records(rows_by_time_frame[i])
+        df.to_excel(excel_writer, sheet_name=sheet_name)
+    excel_writer.save()
