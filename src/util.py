@@ -39,7 +39,7 @@ def get_company_info(s_code):
     the_script = ''
     for script in scripts:
         tmp_text = script.text
-        if tmp_text.find(constants.search_term_var_totalcapital) >= 0:
+        if tmp_text.find(constants.search_term_var_total_capital) >= 0:
             the_script = tmp_text
             break
     texts = the_script.split('\n')
@@ -47,10 +47,10 @@ def get_company_info(s_code):
     for text in texts:
         if total_capital > 0.0 and curr_capital > 0.0:
             break
-        if text.find(constants.search_term_var_totalcapital) >= 0:
+        if text.find(constants.search_term_var_total_capital) >= 0:
             i_semicolon = text.find(constants.semicolon)
             total_capital = float(text[:i_semicolon].split(constants.split_term)[1]) * constants.ten_thousand
-        elif text.find(constants.search_term_var_currcapital) >= 0:
+        elif text.find(constants.search_term_var_curr_capital) >= 0:
             i_semicolon = text.find(constants.semicolon)
             curr_capital = float(text[:i_semicolon].split(constants.split_term)[1]) * constants.ten_thousand
     return [total_capital, curr_capital]
@@ -101,19 +101,32 @@ def get_stock_data_for_past_twenty_days_of_one_company(code):
     return sorted(refined_data, key=itemgetter(constants.HD_DATE))
 
 
-def if_data_satisfies_model(data, record):
+def if_data_satisfies_model(data, record,
+                            threshold_share_hold_percentage=constants.const_threshold_share_hold_percentage,
+                            threshold_buy_in=constants.const_threshold_buy_in,
+                            timeframe=20):
     resp = {}
+    false_resp = {constants.const_if_model_satisfied: False}
+    if len(data) < timeframe:
+        return false_resp
     if record[constants.const_s_curr_capital] > 0:
-        buy_in = (float(data[0][constants.SHARE_HOLD_SUM]) - float(data[-1][constants.SHARE_HOLD_SUM])) / record[constants.const_s_curr_capital]
-        total_share_hold_percentage = float(data[0][constants.SHARE_HOLD_SUM]) / record[constants.const_s_curr_capital]
-        resp[constants.const_if_model_satisfied] = buy_in > 0.005 and total_share_hold_percentage > 0.02
+        index = timeframe if timeframe < len(data) else timeframe - 1
+        share_hold_sum_today = float(data[0][constants.SHARE_HOLD_SUM])
+        share_hold_sum_range = float(data[index][constants.SHARE_HOLD_SUM]) if index > 0 else 0.0
+        curr_capital = record[constants.const_s_curr_capital]
+        buy_in = (share_hold_sum_today - share_hold_sum_range) / curr_capital
+        share_hold_percentage = share_hold_sum_today / curr_capital
+        resp[
+            constants.const_if_model_satisfied] = buy_in > threshold_buy_in and share_hold_percentage > threshold_share_hold_percentage
         resp[constants.const_total_buy_in] = buy_in
-        resp[constants.const_share_hold_percentage] = total_share_hold_percentage
+        resp[constants.const_share_hold_percentage] = share_hold_percentage
         return resp
-    return {constants.const_if_model_satisfied: False}
+    return false_resp
 
 
-def process():
+def process(
+        threshold_share_hold_percentage=constants.const_threshold_share_hold_percentage,
+        threshold_buy_in=constants.const_threshold_buy_in):
     entries = os.listdir()
     records = []
     if constants.filename_code_company_info_records not in entries:
@@ -126,28 +139,38 @@ def process():
         print('Finish loading data')
 
     now = datetime.datetime.now()
-    csv_filename = "%d_%d_%d.csv"%(now.year, now.month, now.day)
-    csv_file = open(csv_filename, 'w')
     headers = [
         constants.const_ch_stock_code,
         constants.const_ch_stock_name,
         constants.const_ch_share_hold_percentage,
         constants.const_ch_total_buy_in
     ]
-    writer = csv.DictWriter(csv_file, fieldnames=headers)
-    writer.writeheader()
+    time_frames = [20, 5, 1]
+    csv_filenames = ["%d_%d_%d_past_%d.csv" % (now.year, now.month, now.day, time_frame) for time_frame in time_frames]
+    csv_files = [open(csv_filename, 'w') for csv_filename in csv_filenames]
+    writers = [csv.DictWriter(csv_file, fieldnames=headers) for csv_file in csv_files]
+    for writer in writers:
+        writer.writeheader()
     for record in records:
         print('Now for stock', record[constants.const_s_code])
         data = get_stock_data_for_past_twenty_days_of_one_company(record[constants.const_s_code])
         if len(data) == 0:
             continue
-        resp = if_data_satisfies_model(data, record)
-        if resp[constants.const_if_model_satisfied]:
-            row = {
-                constants.const_ch_stock_code: record[constants.const_s_code],
-                constants.const_ch_stock_name: data[0][constants.STOCK_NAME],
-                constants.const_ch_share_hold_percentage: resp[constants.const_share_hold_percentage],
-                constants.const_ch_total_buy_in: resp[constants.const_total_buy_in]
-            }
-            writer.writerow(row)
-    csv_file.close()
+        for i, time_frame in enumerate(time_frames):
+            resp = if_data_satisfies_model(data,
+                                           record,
+                                           threshold_share_hold_percentage=threshold_share_hold_percentage,
+                                           threshold_buy_in=threshold_buy_in,
+                                           timeframe=time_frame
+                                           )
+            if resp[constants.const_if_model_satisfied]:
+                row = {
+                    constants.const_ch_stock_code: record[constants.const_s_code],
+                    constants.const_ch_stock_name: data[0][constants.STOCK_NAME],
+                    constants.const_ch_share_hold_percentage: resp[constants.const_share_hold_percentage],
+                    constants.const_ch_total_buy_in: resp[constants.const_total_buy_in]
+                }
+                writers[i].writerow(row)
+
+    for csv_file in csv_files:
+        csv_file.close()

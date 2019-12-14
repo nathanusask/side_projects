@@ -34,8 +34,8 @@ fields = [
 company_info_url_prefix = 'https://finance.sina.com.cn/realstock/company/sh'
 company_info_url_suffix = '/nc.shtml'
 split_term = ' = '
-search_term_var_totalcapital = 'var totalcapital'
-search_term_var_currcapital = 'var currcapital'
+search_term_var_total_capital = 'var totalcapital'
+search_term_var_curr_capital = 'var currcapital'
 ten_thousand = 1e4
 semicolon = ';'
 
@@ -46,3 +46,6 @@ const_ch_total_buy_in = '累计买入'
 const_total_buy_in = 'total_buy_in'
 const_ch_stock_code = '股票代码'
 const_ch_stock_name = '股票名称'
+
+const_threshold_share_hold_percentage = 0.02
+const_threshold_buy_in = 0.005
